@@ -1,122 +1,70 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect } from 'react'
+import useStore from './store/useStore'
+import BottomNav from './components/ui/BottomNav'
+import Home from './pages/Home'
+import JarsPage from './pages/JarsPage'
+import AccountsPage from './pages/AccountsPage'
+import IncomePage from './pages/IncomePage'
+import HistoryPage from './pages/HistoryPage'
+import FlowPage from './pages/FlowPage'
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const { activeTab, checkCarryOver } = useStore()
+
+  useEffect(() => {
+    checkCarryOver()
+  }, [])
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div style={{
+      height: '100dvh',
+      display: 'flex',
+      flexDirection: 'column',
+      background: '#020817',
+      color: '#f1f5f9',
+      fontFamily: "'DM Sans', sans-serif",
+      overflow: 'hidden',
+      maxWidth: 480,
+      margin: '0 auto',
+      position: 'relative',
+    }}>
+      {/* Google Font */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        input, select, textarea { font-family: inherit; }
+        @keyframes liquidWave {
+          0%,100% { transform: translateX(-10%) scaleY(1); }
+          50% { transform: translateX(10%) scaleY(1.05); }
+        }
+        @keyframes flowDash {
+          from { stroke-dashoffset: 30; }
+          to   { stroke-dashoffset: 0; }
+        }
+        @keyframes fadeIn {
+          from { opacity:0; transform:translateY(8px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes slideUp {
+          from { transform:translateY(100%); }
+          to   { transform:translateY(0); }
+        }
+        .page { animation: fadeIn 0.2s ease; }
+        .sheet { animation: slideUp 0.25s cubic-bezier(0.32,0.72,0,1); }
+      `}</style>
 
-      <div className="ticks"></div>
+      {/* Page content */}
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        {activeTab === 'home'     && <Home />}
+        {activeTab === 'jars'     && <JarsPage />}
+        {activeTab === 'accounts' && <AccountsPage />}
+        {activeTab === 'income'   && <IncomePage />}
+        {activeTab === 'history'  && <HistoryPage />}
+        {activeTab === 'flow'     && <FlowPage />}
+      </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      {/* Bottom Nav */}
+      <BottomNav />
+    </div>
   )
 }
-
-export default App
