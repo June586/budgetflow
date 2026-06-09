@@ -577,19 +577,19 @@ export default function FlowPage() {
           })}
 
           {/* Nodes */}
-          {nodes.map(node => {
-            const props = {
-              key: node.id, node,
-              selected: editNodeId === node.id,
-              onDrag: startDrag,
-              onSelect: (id) => { setEditNodeId(id); setEditPipeId(null) },
-            }
-            if (node.type === 'income')    return <IncomeCard {...props} />
-            if (node.type === 'group')     return <GroupCard {...props} />
-            if (node.type === 'expense')   return <ExpenseCard {...props} />
-            if (node.type === 'remainder') return <RemainderCard {...props} />
-            return null
-          })}
+{nodes.map(node => {
+  const props = {
+    node,
+    selected: editNodeId === node.id,
+    onDrag: startDrag,
+    onSelect: (id) => { setEditNodeId(id); setEditPipeId(null) },
+  }
+  if (node.type === 'income')    return <IncomeCard    key={node.id} {...props} />
+  if (node.type === 'group')     return <GroupCard     key={node.id} {...props} />
+  if (node.type === 'expense')   return <ExpenseCard   key={node.id} {...props} />
+  if (node.type === 'remainder') return <RemainderCard key={node.id} {...props} />
+  return null
+})}
         </div>
       </div>
 

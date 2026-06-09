@@ -300,15 +300,24 @@ const useStore = create((set, get) => {
     },
 
     // ── Carry-over (chạy đầu tháng) ─────────────────────────
-    checkCarryOver: () => {
-      const s = get()
-      const currentMonth = getCurrentMonth()
-      if (s.lastRunMonth === currentMonth) return // đã chạy tháng này
+checkCarryOver: () => {
+  const s = get()
+  const currentMonth = getCurrentMonth()
 
-      const newNodes = processCarryOver(s.nodes, currentMonth)
-      set({ nodes: newNodes, lastRunMonth: currentMonth })
-      get()._save()
-    },
+  // Lần đầu dùng app → chỉ set month, không sinh carry-over
+  if (!s.lastRunMonth) {
+    set({ lastRunMonth: currentMonth })
+    get()._save()
+    return
+  }
+
+  // Đã chạy tháng này rồi → bỏ qua
+  if (s.lastRunMonth === currentMonth) return
+
+  const newNodes = processCarryOver(s.nodes, currentMonth)
+  set({ nodes: newNodes, lastRunMonth: currentMonth })
+  get()._save()
+},
 
     // ── Canvas selection ─────────────────────────────────────
     selectNode: (id) => set({ selectedNodeId: id, selectedPipeId: null }),
