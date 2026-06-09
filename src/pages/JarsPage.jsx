@@ -953,7 +953,7 @@ function EditExpenseForm({ node, onDone }) {
 
 // ── Main JarsPage ─────────────────────────────────────────────
 export default function JarsPage() {
-  const { nodes, setTab } = useStore()
+  const { nodes, setTab, reorderExpense, deleteNode } = useStore()
   const [createSheet, setCreateSheet] = useState(null) // 'jar'|'group'|'expense'
   const [detailJar, setDetailJar] = useState(null)     // { jar, parentGroup }
   const [detailExp, setDetailExp] = useState(null)
@@ -1269,167 +1269,94 @@ function ExpenseCard({ node, onPress, onEdit, onDelete, onReorder }) {
       border: `1px solid ${isCarryover ? '#F59E0B44' : '#1e293b'}`,
       borderRadius: 14, marginBottom: 10,
       opacity: isCarryover ? 0.85 : 1,
-    }}
-    >
-    <div
-      onClick={onPress}
-      style={{
-        background: '#0a0f1e',
-        border: `1px solid ${isCarryover ? '#F59E0B44' : '#1e293b'}`,
-        borderRadius: 14, padding: '14px 16px',
-        marginBottom: 10, display: 'flex',
-        alignItems: 'center', gap: 12, cursor: 'pointer',
-        opacity: isCarryover ? 0.85 : 1,
-      }}
-    >
-      {/* Mini liquid */}
-      <div style={{
-        width: 40, height: 40, borderRadius: 10,
-        background: '#0f172a', overflow: 'hidden',
-        border: `2px solid ${node.color}44`,
-        position: 'relative', flexShrink: 0,
-      }}>
+    }}>
+      <div
+        onClick={onPress}
+        style={{
+          background: '#0a0f1e',
+          border: `1px solid ${isCarryover ? '#F59E0B44' : '#1e293b'}`,
+          borderRadius: 14, padding: '14px 16px',
+          display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+          opacity: isCarryover ? 0.85 : 1,
+        }}
+      >
+        {/* Mini liquid */}
         <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          height: pct + '%',
-          background: node.color,
-          transition: 'height 0.5s',
-        }} />
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 10, fontWeight: 800,
-          color: pct > 50 ? '#fff' : '#94a3b8',
+          width: 40, height: 40, borderRadius: 10,
+          background: '#0f172a', overflow: 'hidden',
+          border: `2px solid ${node.color}44`,
+          position: 'relative', flexShrink: 0,
         }}>
-          {Math.round(pct)}%
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            height: pct + '%',
+            background: node.color,
+            transition: 'height 0.5s',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, fontWeight: 800,
+            color: pct > 50 ? '#fff' : '#94a3b8',
+          }}>
+            {Math.round(pct)}%
+          </div>
         </div>
-      </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 14 }}>{node.name}</span>
-          {isCarryover && (
-            <span style={{
-              background: '#F59E0B22', color: '#F59E0B',
-              fontSize: 9, fontWeight: 700, padding: '1px 6px',
-              borderRadius: 4,
-            }}>
-              {node.monthRef}
-            </span>
-          )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 14 }}>{node.name}</span>
+            {isCarryover && (
+              <span style={{
+                background: '#F59E0B22', color: '#F59E0B',
+                fontSize: 9, fontWeight: 700, padding: '1px 6px',
+                borderRadius: 4,
+              }}>
+                {node.monthRef}
+              </span>
+            )}
+          </div>
+          <ProgressBar current={node.currentAmount || 0} limit={node.limitAmount} color={node.color} height={4} />
+          <div style={{ color: '#64748b', fontSize: 11, marginTop: 3 }}>
+            {fmt(node.currentAmount || 0)} / {fmt(node.limitAmount)}đ
+            {node.deadline && ` · ⏰ ${node.deadline}`}
+          </div>
         </div>
-        <ProgressBar current={node.currentAmount || 0} limit={node.limitAmount} color={node.color} height={4} />
-        <div style={{ color: '#64748b', fontSize: 11, marginTop: 3 }}>
-          {fmt(node.currentAmount || 0)} / {fmt(node.limitAmount)}đ
-          {node.deadline && ` · ⏰ ${node.deadline}`}
-        </div>
+        <span style={{ color: '#334155', fontSize: 16 }}>›</span>
       </div>
-      <span style={{ color: '#334155', fontSize: 16 }}>›</span>
 
       {/* Controls */}
       {!isCarryover && (
         <div style={{
-          display:'flex', gap:6, padding:'0 16px 12px',
-          justifyContent:'flex-end',
+          display: 'flex', gap: 6, padding: '0 16px 12px',
+          justifyContent: 'flex-end',
         }}>
           <button onClick={() => onReorder?.('up')} style={{
-            background:'#1e293b', border:'none', borderRadius:6,
-            color:'#64748b', cursor:'pointer',
-            width:28, height:28, fontSize:13,
-            display:'flex', alignItems:'center', justifyContent:'center',
+            background: '#1e293b', border: 'none', borderRadius: 6,
+            color: '#64748b', cursor: 'pointer',
+            width: 28, height: 28, fontSize: 13,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>↑</button>
           <button onClick={() => onReorder?.('down')} style={{
-            background:'#1e293b', border:'none', borderRadius:6,
-            color:'#64748b', cursor:'pointer',
-            width:28, height:28, fontSize:13,
-            display:'flex', alignItems:'center', justifyContent:'center',
+            background: '#1e293b', border: 'none', borderRadius: 6,
+            color: '#64748b', cursor: 'pointer',
+            width: 28, height: 28, fontSize: 13,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>↓</button>
           <button onClick={() => onEdit?.(node)} style={{
-            background:'#1e293b', border:'none', borderRadius:6,
-            color:'#94a3b8', cursor:'pointer',
-            width:28, height:28, fontSize:13,
-            display:'flex', alignItems:'center', justifyContent:'center',
+            background: '#1e293b', border: 'none', borderRadius: 6,
+            color: '#94a3b8', cursor: 'pointer',
+            width: 28, height: 28, fontSize: 13,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>✏️</button>
           <button onClick={() => onDelete?.(node)} style={{
-            background:'#1e293b', border:'none', borderRadius:6,
-            color:'#EF4444', cursor:'pointer',
-            width:28, height:28, fontSize:13,
-            display:'flex', alignItems:'center', justifyContent:'center',
+            background: '#1e293b', border: 'none', borderRadius: 6,
+            color: '#EF4444', cursor: 'pointer',
+            width: 28, height: 28, fontSize: 13,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>🗑</button>
         </div>
-      )}  
-        </div>
-       {/* Edit sheets */}
-      <Sheet
-        open={editSheet?.type === 'jar'}
-        onClose={() => setEditSheet(null)}
-        title="✏️ Sửa Hũ"
-        height="90vh"
-      >
-        {editSheet?.type === 'jar' && (
-          <EditJarForm
-            jar={editSheet.node}
-            parentGroup={editSheet.parentGroup}
-            onDone={() => setEditSheet(null)}
-          />
-        )}
-      </Sheet>
-
-      <Sheet
-        open={editSheet?.type === 'group'}
-        onClose={() => setEditSheet(null)}
-        title="✏️ Sửa Xô nhóm"
-        height="95vh"
-      >
-        {editSheet?.type === 'group' && (
-          <EditGroupForm
-            group={editSheet.node}
-            onDone={() => setEditSheet(null)}
-          />
-        )}
-      </Sheet>
-
-      <Sheet
-        open={editSheet?.type === 'expense'}
-        onClose={() => setEditSheet(null)}
-        title="✏️ Sửa Chai"
-        height="90vh"
-      >
-        {editSheet?.type === 'expense' && (
-          <EditExpenseForm
-            node={editSheet.node}
-            onDone={() => setEditSheet(null)}
-          />
-        )}
-      </Sheet>
-
-      {/* Confirm delete */}
-      <Sheet
-        open={!!confirmDel}
-        onClose={() => setConfirmDel(null)}
-        title="🗑 Xác nhận xoá"
-        height="28vh"
-      >
-        <div style={{ color:'#94a3b8', fontSize:14, marginBottom:20 }}>
-          Xoá <strong style={{ color:'#f1f5f9' }}>{confirmDel?.name}</strong>?
-          {confirmDel?.type === 'group' && (
-            <div style={{ color:'#F59E0B', fontSize:12, marginTop:8 }}>
-              ⚠️ Các hũ bên trong cũng sẽ bị xoá
-            </div>
-          )}
-        </div>
-        <div style={{ display:'flex', gap:10 }}>
-          <Button onClick={() => setConfirmDel(null)} variant="ghost" full>Huỷ</Button>
-          <Button
-            onClick={() => { deleteNode(confirmDel.id); setConfirmDel(null) }}
-            variant="danger" full
-          >
-            Xoá
-          </Button>
-        </div>
-      </Sheet>
-
-
-    </div> 
+      )}
+    </div>
   )
 }
