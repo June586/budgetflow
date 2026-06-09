@@ -8,7 +8,7 @@ import { Input, Select } from '../components/ui/Input'
 import { fmt, fmtShort, daysUntil, daysLeftInMonth, getCurrentMonth } from '../lib/helpers'
 import { calcBackward } from '../lib/engine'
 import { COLORS, REPEAT_OPTIONS } from '../constants'
-import { uid } from '../lib/helpers'
+import { uid, formatMonthLabel  } from '../lib/helpers'
 
 // ── Progress Bar ──────────────────────────────────────────────
 function ProgressBar({ current, limit, color, height = 6 }) {
@@ -702,12 +702,263 @@ function CreateExpenseForm({ onDone }) {
   )
 }
 
+// ── Edit Forms ────────────────────────────────────────────────
+function EditJarForm({ jar, parentGroup, onDone }) {
+  const { updateNode } = useStore()
+  const { accounts } = useStore()
+  const [name, setName] = useState(jar.name)
+  const [color, setColor] = useState(jar.color)
+  const [limitAmount, setLimitAmount] = useState(jar.limitAmount || '')
+  const [accountId, setAccountId] = useState(jar.accountId || '')
+  const [description, setDescription] = useState(jar.description || '')
+  const [ratio, setRatio] = useState(jar.ratio || 0)
+
+  const submit = () => {
+    if (!name) return
+    const updatedJar = {
+      ...jar,
+      name, color, description,
+      limitAmount: limitAmount ? parseFloat(limitAmount) : null,
+      accountId: accountId || null,
+      ratio: parseFloat(ratio) || 0,
+    }
+    // Cập nhật jar trong group cha
+    if (parentGroup) {
+      const updatedGroup = {
+        ...parentGroup,
+        children: parentGroup.children.map(c =>
+          c.id === jar.id ? updatedJar : c
+        ),
+      }
+      updateNode(updatedGroup)
+    } else {
+      updateNode(updatedJar)
+    }
+    onDone()
+  }
+
+  return (
+    <div>
+      <Field label="Tên hũ">
+        <Input value={name} onChange={setName} />
+      </Field>
+      {parentGroup && (
+        <Field label="Tỷ lệ (%)" hint="Tổng các hũ trong xô phải = 100%">
+          <Input type="number" value={ratio} onChange={setRatio} />
+        </Field>
+      )}
+      <Field label="Màu">
+        <ColorPicker value={color} onChange={setColor} />
+      </Field>
+      <Field label="Hạn mức (đ)" hint="Để trống = không giới hạn (đầu tư)">
+        <Input type="number" value={limitAmount} onChange={setLimitAmount} placeholder="Không giới hạn" />
+      </Field>
+      <Field label="Tài khoản">
+        <Select value={accountId} onChange={setAccountId}>
+          <option value="">— Chưa gắn —</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </Select>
+      </Field>
+      <Field label="Mô tả">
+        <Input value={description} onChange={setDescription} placeholder="Ghi chú..." />
+      </Field>
+      <Button onClick={submit} full>💾 Lưu thay đổi</Button>
+    </div>
+  )
+}
+
+function EditGroupForm({ group, onDone }) {
+  const { updateNode, accounts } = useStore()
+  const [name, setName] = useState(group.name)
+  const [color, setColor] = useState(group.color)
+  const [limitAmount, setLimitAmount] = useState(group.limitAmount || '')
+  const [children, setChildren] = useState(
+    group.children.map(c => ({ ...c, limitAmount: c.limitAmount || '' }))
+  )
+
+  const totalRatio = children.reduce((s, c) => s + (parseFloat(c.ratio) || 0), 0)
+
+  const updateChild = (idx, field, val) => {
+    setChildren(cs => cs.map((c, i) => i === idx ? { ...c, [field]: val } : c))
+  }
+
+  const submit = () => {
+    if (!name || totalRatio !== 100) return
+    updateNode({
+      ...group,
+      name, color,
+      limitAmount: limitAmount ? parseFloat(limitAmount) : null,
+      children: children.map(c => ({
+        ...c,
+        ratio: parseFloat(c.ratio) || 0,
+        limitAmount: c.limitAmount ? parseFloat(c.limitAmount) : null,
+        accountId: c.accountId || null,
+      })),
+    })
+    onDone()
+  }
+
+  return (
+    <div>
+      <Field label="Tên xô">
+        <Input value={name} onChange={setName} />
+      </Field>
+      <Field label="Màu">
+        <ColorPicker value={color} onChange={setColor} />
+      </Field>
+      <Field label="Hạn mức tổng (đ)" hint="Để trống = không giới hạn">
+        <Input type="number" value={limitAmount} onChange={setLimitAmount} placeholder="Không giới hạn" />
+      </Field>
+
+      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:10, marginTop:4 }}>
+        <span style={{ color:'#64748b', fontSize:11, fontWeight:700, letterSpacing:'0.05em' }}>
+          HŨ BÊN TRONG
+        </span>
+        <span style={{ color: totalRatio===100?'#10B981':'#EF4444', fontSize:12, fontWeight:700 }}>
+          ∑ {totalRatio}% {totalRatio!==100?'⚠️':'✓'}
+        </span>
+      </div>
+
+      {children.map((c, idx) => (
+        <div key={c.id} style={{
+          background:'#0f172a', borderRadius:12,
+          padding:12, marginBottom:10,
+          border:`1px solid ${c.color||group.color}22`,
+        }}>
+          <div style={{ color:'#94a3b8', fontSize:12, fontWeight:700, marginBottom:8 }}>
+            {c.name}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+            <div>
+              <div style={{ color:'#475569', fontSize:10, marginBottom:3 }}>Tỷ lệ (%)</div>
+              <Input type="number" value={c.ratio}
+                onChange={v => updateChild(idx, 'ratio', parseFloat(v)||0)} />
+            </div>
+            <div>
+              <div style={{ color:'#475569', fontSize:10, marginBottom:3 }}>Hạn mức (đ)</div>
+              <Input type="number" value={c.limitAmount}
+                onChange={v => updateChild(idx, 'limitAmount', v)}
+                placeholder="Không giới hạn" />
+            </div>
+          </div>
+          <div>
+            <div style={{ color:'#475569', fontSize:10, marginBottom:3 }}>Tài khoản</div>
+            <Select value={c.accountId||''} onChange={v => updateChild(idx, 'accountId', v)}>
+              <option value="">— Chưa gắn —</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </Select>
+          </div>
+          <div style={{ marginTop:8 }}>
+            <ColorPicker value={c.color||group.color} onChange={v => updateChild(idx, 'color', v)} />
+          </div>
+        </div>
+      ))}
+
+      <Button onClick={submit} full disabled={totalRatio!==100}>
+        💾 Lưu thay đổi
+      </Button>
+    </div>
+  )
+}
+
+function EditExpenseForm({ node, onDone }) {
+  const { updateNode, accounts } = useStore()
+  const [name, setName] = useState(node.name)
+  const [color, setColor] = useState(node.color)
+  const [limitAmount, setLimitAmount] = useState(node.limitAmount || '')
+  const [deadline, setDeadline] = useState(node.deadline || '')
+  const [description, setDescription] = useState(node.description || '')
+  const [accountId, setAccountId] = useState(node.accountId || '')
+  const [repeat, setRepeat] = useState(node.repeat || 'monthly')
+  const [repeatUntil, setRepeatUntil] = useState(node.repeatUntil || '')
+
+  const isCarryover = node.status === 'carryover'
+
+  const submit = () => {
+    if (!name) return
+    updateNode({
+      ...node,
+      name, color, deadline, description,
+      accountId: accountId || null,
+      repeat, repeatUntil: repeatUntil || null,
+      // Không cho sửa limitAmount nếu là carryover
+      limitAmount: isCarryover ? node.limitAmount : (parseFloat(limitAmount) || node.limitAmount),
+    })
+    onDone()
+  }
+
+  return (
+    <div>
+      <Field label="Tên chi phí">
+        <Input value={name} onChange={setName} />
+      </Field>
+      <Field label="Màu">
+        <ColorPicker value={color} onChange={setColor} />
+      </Field>
+      {!isCarryover && (
+        <Field label="Hạn mức (đ)">
+          <Input type="number" value={limitAmount} onChange={setLimitAmount} />
+        </Field>
+      )}
+      {isCarryover && (
+        <div style={{
+          background:'#F59E0B11', border:'1px solid #F59E0B33',
+          borderRadius:10, padding:'10px 14px', marginBottom:14,
+          color:'#F59E0B', fontSize:12,
+        }}>
+          ⚠️ Chai carry-over — không thể sửa hạn mức
+        </div>
+      )}
+      <Field label="Deadline">
+        <Input type="date" value={deadline} onChange={setDeadline} />
+      </Field>
+      <Field label="Mô tả">
+        <Input value={description} onChange={setDescription} placeholder="Ghi chú..." />
+      </Field>
+      <Field label="Tài khoản">
+        <Select value={accountId} onChange={setAccountId}>
+          <option value="">— Chưa gắn —</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </Select>
+      </Field>
+      {!isCarryover && (
+        <Field label="Lặp lại">
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            {REPEAT_OPTIONS.map(r => (
+              <button key={r.id} onClick={() => setRepeat(r.id)} style={{
+                padding:'9px 0', borderRadius:10,
+                border:`1px solid ${repeat===r.id?'#3B82F6':'#1e293b'}`,
+                background: repeat===r.id?'#3B82F622':'#0f172a',
+                color: repeat===r.id?'#3B82F6':'#64748b',
+                fontSize:12, fontWeight:600, cursor:'pointer',
+              }}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
+      {!isCarryover && repeat !== 'none' && (
+        <Field label="Lặp đến" hint="Để trống = mãi mãi">
+          <Input type="month" value={repeatUntil} onChange={setRepeatUntil} />
+        </Field>
+      )}
+      <Button onClick={submit} full style={{ marginTop:8 }}>
+        💾 Lưu thay đổi
+      </Button>
+    </div>
+  )
+}
+
+
 // ── Main JarsPage ─────────────────────────────────────────────
 export default function JarsPage() {
   const { nodes, setTab } = useStore()
   const [createSheet, setCreateSheet] = useState(null) // 'jar'|'group'|'expense'
   const [detailJar, setDetailJar] = useState(null)     // { jar, parentGroup }
   const [detailExp, setDetailExp] = useState(null)
+  const [editSheet, setEditSheet] = useState(null)   // { type, node, parentGroup }
+  const [confirmDel, setConfirmDel] = useState(null) // node to delete
 
   const groups = nodes.filter(n => n.type === 'group')
   const jars = nodes.filter(n => n.type === 'jar')
@@ -734,10 +985,15 @@ export default function JarsPage() {
       {/* Section: Xô nhóm */}
       {groups.length > 0 && (
         <Section title="Xô nhóm">
-          {groups.map(grp => (
-            <GroupCard key={grp.id} group={grp}
-              onJarPress={(jar) => setDetailJar({ jar, parentGroup: grp })} />
-          ))}
+        {groups.map(grp => (
+          <GroupCard
+            key={grp.id}
+            group={grp}
+            onJarPress={(jar) => setDetailJar({ jar, parentGroup: grp })}
+            onEdit={(g) => setEditSheet({ type:'group', node:g })}
+            onDelete={(g) => setConfirmDel(g)}
+          />
+        ))}
         </Section>
       )}
 
@@ -754,10 +1010,16 @@ export default function JarsPage() {
       {/* Section: Chai carry-over */}
       {carryovers.length > 0 && (
         <Section title="⏳ Tháng trước chưa xong">
-          {carryovers.map(exp => (
-            <ExpenseCard key={exp.id} node={exp}
-              onPress={() => setDetailExp(exp)} />
-          ))}
+        {carryovers.map(exp => (
+          <ExpenseCard
+            key={exp.id}
+            node={exp}
+            onPress={() => setDetailExp(exp)}
+            onEdit={(n) => setEditSheet({ type: 'expense', node: n })}
+            onDelete={undefined}        // hoặc bỏ hẳn nếu không muốn cho phép xóa carryover
+            onReorder={undefined}       // carryover thường không reorder
+          />
+        ))}
         </Section>
       )}
 
@@ -768,10 +1030,16 @@ export default function JarsPage() {
             Chưa có chai nào
           </div>
         )}
-        {actives.map(exp => (
-          <ExpenseCard key={exp.id} node={exp}
-            onPress={() => setDetailExp(exp)} />
-        ))}
+      {actives.map(exp => (
+        <ExpenseCard
+          key={exp.id}
+          node={exp}
+          onPress={() => setDetailExp(exp)}
+          onEdit={(n) => setEditSheet({ type: 'expense', node: n })}
+          onDelete={(n) => setConfirmDel(n)}
+          onReorder={(dir) => reorderExpense(exp.id, dir)}
+        />
+      ))}
       </Section>
 
       {/* FAB tạo mới */}
@@ -858,7 +1126,7 @@ function Section({ title, children }) {
   )
 }
 
-function GroupCard({ group, onJarPress }) {
+function GroupCard({ group, onJarPress, onEdit, onDelete, onJarEdit }) {
   const [open, setOpen] = useState(false)
   const total = group.children?.reduce((s, c) => s + (c.currentAmount || 0), 0) || 0
   const limit = group.limitAmount
@@ -890,6 +1158,21 @@ function GroupCard({ group, onJarPress }) {
           </div>
         </div>
         <span style={{ color: '#475569', fontSize: 14 }}>{open ? '▲' : '▼'}</span>
+        
+        {/* Thêm sau dòng hiện số tiền */}
+        <div style={{ display:'flex', gap:6, marginTop:6 }}>
+          <button onClick={e => { e.stopPropagation(); onEdit?.(group) }} style={{
+            background:'#1e293b', border:'none', borderRadius:6,
+            color:'#94a3b8', cursor:'pointer',
+            padding:'4px 10px', fontSize:11,
+          }}>✏️ Sửa</button>
+          <button onClick={e => { e.stopPropagation(); onDelete?.(group) }} style={{
+            background:'#1e293b', border:'none', borderRadius:6,
+            color:'#EF4444', cursor:'pointer',
+            padding:'4px 10px', fontSize:11,
+          }}>🗑 Xoá</button>
+        </div>
+
       </div>
 
       {/* Jar list */}
@@ -974,13 +1257,20 @@ function JarCard({ jar, onPress }) {
   )
 }
 
-function ExpenseCard({ node, onPress }) {
+function ExpenseCard({ node, onPress, onEdit, onDelete, onReorder }) {
   const isCarryover = node.status === 'carryover'
   const pct = node.limitAmount
     ? Math.min((node.currentAmount || 0) / node.limitAmount * 100, 100)
     : 0
 
   return (
+    <div style={{
+      background: '#0a0f1e',
+      border: `1px solid ${isCarryover ? '#F59E0B44' : '#1e293b'}`,
+      borderRadius: 14, marginBottom: 10,
+      opacity: isCarryover ? 0.85 : 1,
+    }}
+    >
     <div
       onClick={onPress}
       style={{
@@ -1035,6 +1325,111 @@ function ExpenseCard({ node, onPress }) {
         </div>
       </div>
       <span style={{ color: '#334155', fontSize: 16 }}>›</span>
-    </div>
+
+      {/* Controls */}
+      {!isCarryover && (
+        <div style={{
+          display:'flex', gap:6, padding:'0 16px 12px',
+          justifyContent:'flex-end',
+        }}>
+          <button onClick={() => onReorder?.('up')} style={{
+            background:'#1e293b', border:'none', borderRadius:6,
+            color:'#64748b', cursor:'pointer',
+            width:28, height:28, fontSize:13,
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>↑</button>
+          <button onClick={() => onReorder?.('down')} style={{
+            background:'#1e293b', border:'none', borderRadius:6,
+            color:'#64748b', cursor:'pointer',
+            width:28, height:28, fontSize:13,
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>↓</button>
+          <button onClick={() => onEdit?.(node)} style={{
+            background:'#1e293b', border:'none', borderRadius:6,
+            color:'#94a3b8', cursor:'pointer',
+            width:28, height:28, fontSize:13,
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>✏️</button>
+          <button onClick={() => onDelete?.(node)} style={{
+            background:'#1e293b', border:'none', borderRadius:6,
+            color:'#EF4444', cursor:'pointer',
+            width:28, height:28, fontSize:13,
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>🗑</button>
+        </div>
+      )}  
+        </div>
+       {/* Edit sheets */}
+      <Sheet
+        open={editSheet?.type === 'jar'}
+        onClose={() => setEditSheet(null)}
+        title="✏️ Sửa Hũ"
+        height="90vh"
+      >
+        {editSheet?.type === 'jar' && (
+          <EditJarForm
+            jar={editSheet.node}
+            parentGroup={editSheet.parentGroup}
+            onDone={() => setEditSheet(null)}
+          />
+        )}
+      </Sheet>
+
+      <Sheet
+        open={editSheet?.type === 'group'}
+        onClose={() => setEditSheet(null)}
+        title="✏️ Sửa Xô nhóm"
+        height="95vh"
+      >
+        {editSheet?.type === 'group' && (
+          <EditGroupForm
+            group={editSheet.node}
+            onDone={() => setEditSheet(null)}
+          />
+        )}
+      </Sheet>
+
+      <Sheet
+        open={editSheet?.type === 'expense'}
+        onClose={() => setEditSheet(null)}
+        title="✏️ Sửa Chai"
+        height="90vh"
+      >
+        {editSheet?.type === 'expense' && (
+          <EditExpenseForm
+            node={editSheet.node}
+            onDone={() => setEditSheet(null)}
+          />
+        )}
+      </Sheet>
+
+      {/* Confirm delete */}
+      <Sheet
+        open={!!confirmDel}
+        onClose={() => setConfirmDel(null)}
+        title="🗑 Xác nhận xoá"
+        height="28vh"
+      >
+        <div style={{ color:'#94a3b8', fontSize:14, marginBottom:20 }}>
+          Xoá <strong style={{ color:'#f1f5f9' }}>{confirmDel?.name}</strong>?
+          {confirmDel?.type === 'group' && (
+            <div style={{ color:'#F59E0B', fontSize:12, marginTop:8 }}>
+              ⚠️ Các hũ bên trong cũng sẽ bị xoá
+            </div>
+          )}
+        </div>
+        <div style={{ display:'flex', gap:10 }}>
+          <Button onClick={() => setConfirmDel(null)} variant="ghost" full>Huỷ</Button>
+          <Button
+            onClick={() => { deleteNode(confirmDel.id); setConfirmDel(null) }}
+            variant="danger" full
+          >
+            Xoá
+          </Button>
+        </div>
+      </Sheet>
+
+
+    </div> 
   )
 }

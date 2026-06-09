@@ -1,5 +1,38 @@
 import { uid, getCurrentMonth } from './helpers'
 
+// ── Làm tròn đến đơn vị 5.000đ ───────────────────────────────
+const ROUND_UNIT = 5000
+
+function roundToUnit(value) {
+  return Math.round(value / ROUND_UNIT) * ROUND_UNIT
+}
+
+// Chia tiền có làm tròn — hũ cuối nhận phần dư
+function distributeRounded(amount, targets) {
+  // targets: [{id, ratio, limit, current}]
+  if (!targets.length) return {}
+
+  // Chạy parallel distribution bình thường trước
+  const raw = distributeParallel(amount, targets)
+
+  const ids = targets.map(t => t.id)
+  const rounded = {}
+  let runningTotal = 0
+
+  // Làm tròn tất cả trừ hũ cuối
+  for (let i = 0; i < ids.length - 1; i++) {
+    const r = roundToUnit(raw[ids[i]])
+    rounded[ids[i]] = r
+    runningTotal += r
+  }
+
+  // Hũ cuối nhận toàn bộ phần còn lại (không làm tròn)
+  const lastId = ids[ids.length - 1]
+  rounded[lastId] = Math.max(0, amount - runningTotal)
+
+  return rounded
+}
+
 // ── Parallel distribution với redistribution ──────────────────
 export function distributeParallel(amount, targets) {
   // targets: [{ id, ratio, limit, current }]
@@ -44,7 +77,6 @@ export function distributeParallel(amount, targets) {
 export function distributeToGroup(amount, group, ratioOverride) {
   if (!group.children?.length) return {}
 
-  const ratios = ratioOverride || {}
   const targets = group.children.map(jar => ({
     id:      jar.id,
     ratio:   ratioOverride ? (ratioOverride[jar.id] || 0) : jar.ratio,
@@ -52,7 +84,8 @@ export function distributeToGroup(amount, group, ratioOverride) {
     current: jar.currentAmount || 0,
   }))
 
-  return distributeParallel(amount, targets)
+  // Dùng distributeRounded thay vì distributeParallel
+  return distributeRounded(amount, targets)
 }
 
 // ── Flow Engine chính ─────────────────────────────────────────
@@ -152,13 +185,22 @@ export function runFlowEngine(inputAmount, nodes, pipes, monthlyReceived = {}) {
         .filter(p => p.fromId === rem.id)
         .sort((a, b) => a.sortOrder - b.sortOrder)
 
-      // Tính tổng ratio để chia
       const totalRatio = remOutPipes.reduce((s, p) => s + p.ratio, 0)
+
       if (totalRatio > 0) {
-        for (const rp of remOutPipes) {
-          const share = pool * (rp.ratio / 100)
+        let remRunning = 0
+
+        for (let ri = 0; ri < remOutPipes.length; ri++) {
+          const rp = remOutPipes[ri]
+          const isLast = ri === remOutPipes.length - 1
           const target = nodeMap[rp.toId]
           if (!target) continue
+
+          let share = isLast
+            ? Math.max(0, pool - remRunning)
+            : roundToUnit(pool * (rp.ratio / 100))
+
+          if (!isLast) remRunning += share
 
           if (target.type === 'group') {
             const dist = distributeToGroup(share, target, rp.childRatioOverride)
@@ -169,22 +211,21 @@ export function runFlowEngine(inputAmount, nodes, pipes, monthlyReceived = {}) {
             })
             setAdded(target.id, actualTotal)
           } else {
-            // Hũ đơn hoặc node khác
+            // Hũ đơn — làm tròn luôn
             const space = target.limitAmount === null
               ? share
               : Math.max(0, target.limitAmount - ((target.currentAmount || 0) + (added[target.id] || 0)))
-            const give = Math.min(share, space)
+            const give = Math.min(roundToUnit(share), space)
             setAdded(target.id, give)
           }
         }
       }
-
-      pool = 0
     }
   }
 
+  pool = 0
   return added // { nodeId: amountAdded }
-}
+  }
 
 // ── Build Todo List từ kết quả phân bổ ───────────────────────
 export function buildTodos(added, nodes, accounts) {
@@ -283,7 +324,7 @@ export function processCarryOver(nodes, currentMonth) {
       return
     }
 
-    if (node.repeat === 'none' || !node.repeat) {
+    if (!node.repeat || node.repeat === 'none') {
       newNodes.push(node)
       return
     }
@@ -294,38 +335,42 @@ export function processCarryOver(nodes, currentMonth) {
       return
     }
 
-    // Chai tháng hiện tại (monthRef = null) → xử lý carry-over
-    if (node.monthRef === null) {
-      if ((node.currentAmount || 0) >= node.limitAmount) {
-        // Đã đầy → đóng nắp, tạo chai mới
-        newNodes.push({ ...node, status: 'closed' })
-        toAdd.push({
-          ...node,
-          id:            uid(),
-          currentAmount: 0,
-          monthRef:      null,
-          status:        'active',
-          parentExpenseId: node.id,
-        })
-      } else {
-        // Chưa đầy → carry-over, tạo chai mới song song
-        newNodes.push({
-          ...node,
-          monthRef:  getPrevMonth(currentMonth),
-          status:    'carryover',
-        })
-        toAdd.push({
-          ...node,
-          id:            uid(),
-          currentAmount: 0,
-          monthRef:      null,
-          status:        'active',
-          sortOrder:     node.sortOrder + 0.5,
-          parentExpenseId: node.id,
-        })
-      }
-    } else {
+    // Chỉ xử lý chai tháng hiện tại (monthRef = null)
+    if (node.monthRef !== null) {
       newNodes.push(node)
+      return
+    }
+
+    if ((node.currentAmount || 0) >= node.limitAmount) {
+      // Đã đầy → đóng nắp, tạo chai mới reset
+      newNodes.push({ ...node, status: 'closed' })
+      toAdd.push({
+        ...node,
+        id:              uid(),
+        currentAmount:   0,
+        monthRef:        null,
+        status:          'active',
+        parentExpenseId: node.id,
+        // Giữ nguyên sortOrder → vị trí trong dây chuyền không đổi
+        sortOrder:       node.sortOrder,
+      })
+    } else {
+      // Chưa đầy → giữ chai cũ thành carryover
+      // Chai mới nằm ngay dưới (sortOrder + 0.1)
+      newNodes.push({
+        ...node,
+        monthRef: getPrevMonth(currentMonth),
+        status:   'carryover',
+      })
+      toAdd.push({
+        ...node,
+        id:              uid(),
+        currentAmount:   0,
+        monthRef:        null,
+        status:          'active',
+        parentExpenseId: node.id,
+        sortOrder:       node.sortOrder + 0.1,
+      })
     }
   })
 

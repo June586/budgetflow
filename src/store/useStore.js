@@ -319,6 +319,46 @@ checkCarryOver: () => {
   get()._save()
 },
 
+// ── Đổi thứ tự chai trong dây chuyền ─────────────────────────
+reorderExpense: (expId, direction) => {
+  const s = get()
+
+  // Lấy danh sách chai active (không phải carryover)
+  // Sắp xếp theo sortOrder
+  const activeExps = s.nodes
+    .filter(n => n.type === 'expense' && n.status !== 'carryover' && n.status !== 'closed')
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+
+  const idx = activeExps.findIndex(n => n.id === expId)
+  if (idx === -1) return
+
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+  if (swapIdx < 0 || swapIdx >= activeExps.length) return
+
+  // Swap sortOrder giữa 2 chai
+  const expA = activeExps[idx]
+  const expB = activeExps[swapIdx]
+  const newSortA = expB.sortOrder
+  const newSortB = expA.sortOrder
+
+  const newNodes = s.nodes.map(n => {
+    if (n.id === expA.id) return { ...n, sortOrder: newSortA }
+    if (n.id === expB.id) return { ...n, sortOrder: newSortB }
+    // Carryover của expA cũng đổi theo
+    if (n.parentExpenseId === expA.id && n.status === 'carryover') {
+      return { ...n, sortOrder: newSortA + 0.1 }
+    }
+    if (n.parentExpenseId === expB.id && n.status === 'carryover') {
+      return { ...n, sortOrder: newSortB + 0.1 }
+    }
+    return n
+  })
+
+  set({ nodes: newNodes })
+  get()._save()
+},
+
+
     // ── Canvas selection ─────────────────────────────────────
     selectNode: (id) => set({ selectedNodeId: id, selectedPipeId: null }),
     selectPipe: (id) => set({ selectedPipeId: id, selectedNodeId: null }),
