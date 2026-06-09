@@ -1,7 +1,7 @@
 import useStore from '../../store/useStore'
 
 const TABS = [
-  { id:'jars',     icon:'🪣', label:'Hũ'      },
+  { id:'jars',     icon:'🧊', label:'Hũ'      },
   { id:'accounts', icon:'💳', label:'TK'       },
   { id:'income',   icon:'➕', label:'',  main:true },
   { id:'history',  icon:'📒', label:'Lịch sử' },
