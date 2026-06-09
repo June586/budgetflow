@@ -953,12 +953,18 @@ function EditExpenseForm({ node, onDone }) {
 
 // ── Main JarsPage ─────────────────────────────────────────────
 export default function JarsPage() {
-  const { nodes, setTab, reorderExpense, deleteNode } = useStore()
-  const [createSheet, setCreateSheet] = useState(null) // 'jar'|'group'|'expense'
-  const [detailJar, setDetailJar] = useState(null)     // { jar, parentGroup }
+  const { 
+    nodes, 
+    setTab, 
+    reorderExpense, 
+    deleteNode 
+  } = useStore()
+
+  const [createSheet, setCreateSheet] = useState(null)
+  const [detailJar, setDetailJar] = useState(null)
   const [detailExp, setDetailExp] = useState(null)
-  const [editSheet, setEditSheet] = useState(null)   // { type, node, parentGroup }
-  const [confirmDel, setConfirmDel] = useState(null) // node to delete
+  const [editSheet, setEditSheet] = useState(null)
+  const [confirmDel, setConfirmDel] = useState(null)
 
   const groups = nodes.filter(n => n.type === 'group')
   const jars = nodes.filter(n => n.type === 'jar')
@@ -967,9 +973,7 @@ export default function JarsPage() {
   const actives = expenses.filter(n => n.status === 'active')
 
   const handleViewHistory = (nodeId) => {
-    // Switch to history tab with filter
     setTab('history')
-    // Store filter in sessionStorage
     sessionStorage.setItem('historyFilter', nodeId)
   }
 
@@ -985,15 +989,15 @@ export default function JarsPage() {
       {/* Section: Xô nhóm */}
       {groups.length > 0 && (
         <Section title="Xô nhóm">
-        {groups.map(grp => (
-          <GroupCard
-            key={grp.id}
-            group={grp}
-            onJarPress={(jar) => setDetailJar({ jar, parentGroup: grp })}
-            onEdit={(g) => setEditSheet({ type:'group', node:g })}
-            onDelete={(g) => setConfirmDel(g)}
-          />
-        ))}
+          {groups.map(grp => (
+            <GroupCard
+              key={grp.id}
+              group={grp}
+              onJarPress={(jar) => setDetailJar({ jar, parentGroup: grp })}
+              onEdit={(g) => setEditSheet({ type: 'group', node: g })}
+              onDelete={(g) => setConfirmDel(g)}
+            />
+          ))}
         </Section>
       )}
 
@@ -1001,8 +1005,11 @@ export default function JarsPage() {
       {jars.length > 0 && (
         <Section title="Hũ đơn">
           {jars.map(jar => (
-            <JarCard key={jar.id} jar={jar}
-              onPress={() => setDetailJar({ jar, parentGroup: null })} />
+            <JarCard 
+              key={jar.id} 
+              jar={jar}
+              onPress={() => setDetailJar({ jar, parentGroup: null })} 
+            />
           ))}
         </Section>
       )}
@@ -1010,16 +1017,16 @@ export default function JarsPage() {
       {/* Section: Chai carry-over */}
       {carryovers.length > 0 && (
         <Section title="⏳ Tháng trước chưa xong">
-        {carryovers.map(exp => (
-          <ExpenseCard
-            key={exp.id}
-            node={exp}
-            onPress={() => setDetailExp(exp)}
-            onEdit={(n) => setEditSheet({ type: 'expense', node: n })}
-            onDelete={undefined}        // hoặc bỏ hẳn nếu không muốn cho phép xóa carryover
-            onReorder={undefined}       // carryover thường không reorder
-          />
-        ))}
+          {carryovers.map(exp => (
+            <ExpenseCard
+              key={exp.id}
+              node={exp}
+              onPress={() => setDetailExp(exp)}
+              onEdit={(n) => setEditSheet({ type: 'expense', node: n })}
+              onDelete={undefined}
+              onReorder={undefined}
+            />
+          ))}
         </Section>
       )}
 
@@ -1030,16 +1037,16 @@ export default function JarsPage() {
             Chưa có chai nào
           </div>
         )}
-      {actives.map(exp => (
-        <ExpenseCard
-          key={exp.id}
-          node={exp}
-          onPress={() => setDetailExp(exp)}
-          onEdit={(n) => setEditSheet({ type: 'expense', node: n })}
-          onDelete={(n) => setConfirmDel(n)}
-          onReorder={(dir) => reorderExpense(exp.id, dir)}
-        />
-      ))}
+        {actives.map(exp => (
+          <ExpenseCard
+            key={exp.id}
+            node={exp}
+            onPress={() => setDetailExp(exp)}
+            onEdit={(n) => setEditSheet({ type: 'expense', node: n })}
+            onDelete={(n) => setConfirmDel(n)}
+            onReorder={(dir) => reorderExpense(exp.id, dir)}
+          />
+        ))}
       </Section>
 
       {/* FAB tạo mới */}
@@ -1050,14 +1057,20 @@ export default function JarsPage() {
             { id: 'group', label: '+ Xô', color: '#10B981' },
             { id: 'expense', label: '+ Chai', color: '#EF4444' },
           ].map(btn => (
-            <button key={btn.id} onClick={() => setCreateSheet(btn.id)} style={{
-              padding: '12px 0',
-              background: btn.color + '15',
-              border: `1px solid ${btn.color}44`,
-              borderRadius: 12,
-              color: btn.color, fontSize: 13, fontWeight: 700,
-              cursor: 'pointer',
-            }}>
+            <button 
+              key={btn.id} 
+              onClick={() => setCreateSheet(btn.id)} 
+              style={{
+                padding: '12px 0',
+                background: btn.color + '15',
+                border: `1px solid ${btn.color}44`,
+                borderRadius: 12,
+                color: btn.color, 
+                fontSize: 13, 
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
               {btn.label}
             </button>
           ))}
@@ -1065,28 +1078,15 @@ export default function JarsPage() {
       </div>
 
       {/* Create sheets */}
-      <Sheet
-        open={createSheet === 'jar'}
-        onClose={() => setCreateSheet(null)}
-        title="🪣 Tạo Hũ mới"
-        height="90vh"
-      >
+      <Sheet open={createSheet === 'jar'} onClose={() => setCreateSheet(null)} title="🪣 Tạo Hũ mới" height="90vh">
         <CreateJarForm onDone={() => setCreateSheet(null)} />
       </Sheet>
-      <Sheet
-        open={createSheet === 'group'}
-        onClose={() => setCreateSheet(null)}
-        title="🪣 Tạo Xô nhóm"
-        height="95vh"
-      >
+
+      <Sheet open={createSheet === 'group'} onClose={() => setCreateSheet(null)} title="🪣 Tạo Xô nhóm" height="95vh">
         <CreateGroupForm onDone={() => setCreateSheet(null)} />
       </Sheet>
-      <Sheet
-        open={createSheet === 'expense'}
-        onClose={() => setCreateSheet(null)}
-        title="🍶 Tạo Chai chi phí"
-        height="95vh"
-      >
+
+      <Sheet open={createSheet === 'expense'} onClose={() => setCreateSheet(null)} title="🍶 Tạo Chai chi phí" height="95vh">
         <CreateExpenseForm onDone={() => setCreateSheet(null)} />
       </Sheet>
 
@@ -1106,6 +1106,44 @@ export default function JarsPage() {
           onViewHistory={handleViewHistory}
         />
       )}
+
+      {/* Edit sheets */}
+      <Sheet open={editSheet?.type === 'jar'} onClose={() => setEditSheet(null)} title="✏️ Sửa Hũ" height="90vh">
+        {editSheet?.type === 'jar' && <EditJarForm jar={editSheet.node} onDone={() => setEditSheet(null)} />}
+      </Sheet>
+
+      <Sheet open={editSheet?.type === 'group'} onClose={() => setEditSheet(null)} title="✏️ Sửa Xô nhóm" height="95vh">
+        {editSheet?.type === 'group' && <EditGroupForm group={editSheet.node} onDone={() => setEditSheet(null)} />}
+      </Sheet>
+
+      <Sheet open={editSheet?.type === 'expense'} onClose={() => setEditSheet(null)} title="✏️ Sửa Chai" height="90vh">
+        {editSheet?.type === 'expense' && <EditExpenseForm node={editSheet.node} onDone={() => setEditSheet(null)} />}
+      </Sheet>
+
+      {/* Confirm delete */}
+      <Sheet open={!!confirmDel} onClose={() => setConfirmDel(null)} title="🗑 Xác nhận xoá" height="28vh">
+        <div style={{ color: '#94a3b8', fontSize: 14, marginBottom: 20 }}>
+          Xoá <strong style={{ color: '#f1f5f9' }}>{confirmDel?.name}</strong>?
+          {confirmDel?.type === 'group' && (
+            <div style={{ color: '#F59E0B', fontSize: 12, marginTop: 8 }}>
+              ⚠️ Các hũ bên trong cũng sẽ bị xoá
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Button onClick={() => setConfirmDel(null)} variant="ghost" full>Huỷ</Button>
+          <Button
+            onClick={() => { 
+              deleteNode(confirmDel.id); 
+              setConfirmDel(null) 
+            }} 
+            variant="danger" 
+            full
+          >
+            Xoá
+          </Button>
+        </div>
+      </Sheet>
     </div>
   )
 }
