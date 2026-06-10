@@ -3,18 +3,128 @@ import useStore from '../store/useStore'
 import { fmt, fmtShort, getCurrentMonth } from '../lib/helpers'
 
 // ── Mini Flow Canvas ──────────────────────────────────────────
+// Layout constants (mirror FlowPage)
+const MINI_INC_W = 136, MINI_INC_H = 108
+const MINI_GRP_W = 180, MINI_EXP_W = 148, MINI_REM_W = 136, MINI_JAR_W = 160
+const MINI_START_X = 60, MINI_START_Y = 60
+const MINI_HORIZ_X = 220, MINI_DIAG_X = 200, MINI_DIAG_Y = 110, MINI_REM_Y = 120
+const MINI_REM_CHILD_X = 200
+
+function miniGetW(node) {
+  if (!node) return 120
+  if (node.type === 'income') return MINI_INC_W
+  if (node.type === 'expense') return MINI_EXP_W
+  if (node.type === 'remainder') return MINI_REM_W
+  if (node.type === 'jar') return MINI_JAR_W
+  return MINI_GRP_W
+}
+function miniGetH(node) {
+  if (!node) return 100
+  if (node.type === 'income') return MINI_INC_H
+  if (node.type === 'group') return 100 + (node.children?.length || 0) * 28
+  return 100
+}
+
+function miniComputeLayout(nodes, pipes) {
+  const positions = {}
+  const income = nodes.find(n => n.type === 'income')
+  const remainder = nodes.find(n => n.type === 'remainder')
+  if (!income || !remainder) return positions
+
+  const allNodes = []
+  nodes.forEach(n => { allNodes.push(n); if (n.children) n.children.forEach(c => allNodes.push(c)) })
+  const remOutTargets = new Set(pipes.filter(p => p.fromId === remainder.id).map(p => p.toId))
+
+  const backbone = []
+  let cur = income
+  const visited = new Set()
+  while (cur && !visited.has(cur.id)) {
+    visited.add(cur.id)
+    backbone.push(cur)
+    if (cur.id === remainder.id) break
+    const outPipes = pipes.filter(p => p.fromId === cur.id && allNodes.find(n => n.id === p.toId))
+    let chosen = outPipes.find(p => p.toId === remainder.id)
+    if (!chosen) chosen = outPipes.find(p => !remOutTargets.has(p.toId))
+    if (!chosen) chosen = outPipes.find(p => !visited.has(p.toId))
+    if (!chosen) break
+    cur = allNodes.find(n => n.id === chosen.toId)
+    if (!cur) break
+  }
+
+  let cx = MINI_START_X, cy = MINI_START_Y
+  for (let i = 0; i < backbone.length; i++) {
+    const node = backbone[i]
+    if (node.type === 'remainder') {
+      const prev = backbone[i - 1]
+      const prevPos = prev ? positions[prev.id] : null
+      if (prevPos) {
+        positions[node.id] = {
+          x: prevPos.x + miniGetW(prev) / 2 - MINI_REM_W / 2,
+          y: prevPos.y + miniGetH(prev) + MINI_REM_Y,
+        }
+      } else {
+        positions[node.id] = { x: cx, y: cy + 200 }
+      }
+    } else {
+      positions[node.id] = { x: cx, y: cy }
+    }
+    if (i < backbone.length - 1) {
+      const next = backbone[i + 1]
+      if (next.type !== 'remainder') {
+        if (next.type === 'expense') { cx += MINI_DIAG_X; cy += MINI_DIAG_Y }
+        else { cx += MINI_HORIZ_X }
+      }
+    }
+  }
+
+  if (!positions[remainder.id]) {
+    const last = backbone[backbone.length - 1]
+    const lp = last && positions[last.id] ? positions[last.id] : { x: MINI_START_X, y: MINI_START_Y }
+    positions[remainder.id] = { x: lp.x + miniGetW(last) / 2 - MINI_REM_W / 2, y: lp.y + miniGetH(last) + MINI_REM_Y }
+  }
+
+  // Remainder children
+  const remPos = positions[remainder.id]
+  if (remPos) {
+    const remChildren = pipes
+      .filter(p => p.fromId === remainder.id)
+      .map(p => ({ pipe: p, node: nodes.find(n => n.id === p.toId) }))
+      .filter(item => item.node)
+      .sort((a, b) => (a.pipe.sortOrder || 0) - (b.pipe.sortOrder || 0))
+    if (remChildren.length > 0) {
+      const remCX = remPos.x + MINI_REM_W / 2
+      const childY = remPos.y + 100 + 70
+      const totalW = (remChildren.length - 1) * MINI_REM_CHILD_X
+      const startX = remCX - totalW / 2
+      remChildren.forEach(({ node }, idx) => {
+        if (!positions[node.id]) {
+          positions[node.id] = { x: startX + idx * MINI_REM_CHILD_X - miniGetW(node) / 2, y: childY }
+        }
+      })
+    }
+  }
+
+  return positions
+}
+
 function MiniCanvas({ nodes, pipes }) {
   const nm = {}
-  nodes.forEach(n => { nm[n.id] = n })
+  nodes.forEach(n => {
+    nm[n.id] = n
+    if (n.children) n.children.forEach(c => { nm[c.id] = { ...c, parentId: n.id } })
+  })
 
   const SCALE = 0.38
+  const positions = miniComputeLayout(nodes, pipes)
 
   const getC = (node) => {
-    const w = node.type === 'group' ? 180 : 150
-    const h = node.type === 'group' ? 110 + (node.children?.length || 0) * 34 : 100
+    const pos = positions[node.id] || (node.parentId && positions[node.parentId])
+    if (!pos) return { x: 0, y: 0 }
+    const w = miniGetW(node)
+    const h = miniGetH(node)
     return {
-      x: (node.x + w / 2) * SCALE,
-      y: (node.y + h / 2) * SCALE,
+      x: (pos.x + w / 2) * SCALE,
+      y: (pos.y + h / 2) * SCALE,
     }
   }
 
@@ -45,8 +155,10 @@ function MiniCanvas({ nodes, pipes }) {
 
       {/* Mini nodes */}
       {nodes.map(node => {
-        const x = node.x * SCALE
-        const y = node.y * SCALE
+        const pos = positions[node.id]
+        if (!pos) return null
+        const x = pos.x * SCALE
+        const y = pos.y * SCALE
         if (node.type === 'income') {
           return (
             <div key={node.id} style={{

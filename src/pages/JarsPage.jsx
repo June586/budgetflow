@@ -966,9 +966,10 @@ export default function JarsPage() {
   const [editSheet, setEditSheet] = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
 
-  const groups = nodes.filter(n => n.type === 'group')
-  const jars = nodes.filter(n => n.type === 'jar')
-  const expenses = nodes.filter(n => n.type === 'expense' && n.status !== 'closed')
+  // Chỉ lấy node gốc (không phải clone)
+  const groups = nodes.filter(n => n.type === 'group' && !n.originalId)
+  const jars = nodes.filter(n => n.type === 'jar' && !n.originalId)
+  const expenses = nodes.filter(n => n.type === 'expense' && n.status !== 'closed' && !n.originalId)
   const carryovers = expenses.filter(n => n.status === 'carryover')
   const actives = expenses.filter(n => n.status === 'active')
 
@@ -982,7 +983,7 @@ export default function JarsPage() {
       {/* Header */}
       <div style={{ padding: '20px 20px 12px' }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#f1f5f9' }}>
-          🪣 Hũ & Chai
+          🧊 Hũ & Chai
         </h1>
       </div>
 
@@ -1004,13 +1005,15 @@ export default function JarsPage() {
       {/* Section: Hũ đơn */}
       {jars.length > 0 && (
         <Section title="Hũ đơn">
-          {jars.map(jar => (
-            <JarCard 
-              key={jar.id} 
-              jar={jar}
-              onPress={() => setDetailJar({ jar, parentGroup: null })} 
-            />
-          ))}
+        {jars.map(jar => (
+          <JarCard 
+            key={jar.id} 
+            jar={jar}
+            onPress={() => setDetailJar({ jar, parentGroup: null })}
+            onEdit={(j) => setEditSheet({ type: 'jar', node: j })}
+            onDelete={(j) => setConfirmDel(j)}
+          />
+        ))}
         </Section>
       )}
 
@@ -1254,43 +1257,58 @@ function GroupCard({ group, onJarPress, onEdit, onDelete, onJarEdit }) {
   )
 }
 
-function JarCard({ jar, onPress }) {
+function JarCard({ jar, onPress, onEdit, onDelete }) {
+  const isInvestment = jar.limitAmount === null
+  const pct = jar.limitAmount
+    ? Math.min((jar.currentAmount || 0) / jar.limitAmount * 100, 100)
+    : 0
+
   return (
-    <div
-      onClick={onPress}
-      style={{
-        background: '#0a0f1e',
-        border: '1px solid #1e293b',
-        borderRadius: 14, padding: '14px 16px',
-        marginBottom: 10, display: 'flex',
-        alignItems: 'center', gap: 12, cursor: 'pointer',
-      }}
-    >
-      <div style={{
-        width: 36, height: 36, borderRadius: 10,
-        background: jar.color + '22',
-        border: `2px solid ${jar.color}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, flexShrink: 0,
-      }}>🫙</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
-          {jar.name}
-        </div>
-        {jar.limitAmount ? (
-          <>
-            <ProgressBar current={jar.currentAmount || 0} limit={jar.limitAmount} color={jar.color} height={4} />
-            <div style={{ color: '#64748b', fontSize: 11, marginTop: 3 }}>
-              {fmt(jar.currentAmount || 0)} / {fmt(jar.limitAmount)}đ
-            </div>
-          </>
-        ) : (
-          <div style={{ color: '#64748b', fontSize: 11 }}>
-            📈 {fmt(jar.currentAmount || 0)}đ tích lũy
+    <div style={{ background: '#0a0f1e', border: '1px solid #1e293b', borderRadius: 14, marginBottom: 10, overflow: 'hidden' }}>
+      {/* Phần chính click */}
+      <div
+        onClick={onPress}
+        style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+      >
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: jar.color + '22',
+          border: `2px solid ${jar.color}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, flexShrink: 0,
+        }}>🫙</div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
+            {jar.name}
           </div>
-        )}
+          {isInvestment ? (
+            <div style={{ color: '#64748b', fontSize: 11 }}>
+              📈 {fmt(jar.currentAmount || 0)}đ tích lũy
+            </div>
+          ) : (
+            <>
+              <ProgressBar current={jar.currentAmount || 0} limit={jar.limitAmount} color={jar.color} height={4} />
+              <div style={{ color: '#64748b', fontSize: 11, marginTop: 3 }}>
+                {fmt(jar.currentAmount || 0)} / {fmt(jar.limitAmount)}đ
+              </div>
+            </>
+          )}
+        </div>
+        <span style={{ color: '#334155', fontSize: 16 }}>›</span>
       </div>
-      <span style={{ color: '#334155', fontSize: 16 }}>›</span>
+
+      {/* Nút sửa / xóa (đặt dưới cùng, không che nội dung) */}
+      <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', justifyContent: 'flex-end' }}>
+        <button onClick={e => { e.stopPropagation(); onEdit(jar) }} style={{
+          background: '#1e293b', border: 'none', borderRadius: 6,
+          color: '#94a3b8', cursor: 'pointer', padding: '4px 10px', fontSize: 11
+        }}>✏️ Sửa</button>
+        <button onClick={e => { e.stopPropagation(); onDelete(jar) }} style={{
+          background: '#1e293b', border: 'none', borderRadius: 6,
+          color: '#EF4444', cursor: 'pointer', padding: '4px 10px', fontSize: 11
+        }}>🗑 Xoá</button>
+      </div>
     </div>
   )
 }

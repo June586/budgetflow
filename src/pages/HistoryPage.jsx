@@ -119,17 +119,20 @@ function AddExpenseForm({ onDone }) {
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
 
-  // Flat list hũ/chai có thể rút
+  // Flat list hũ/chai có thể rút — dedupe theo id
   const allNodes = []
+  const seen = new Set()
   nodes.forEach(n => {
     if (n.type === 'group' && n.children) {
-      n.children.forEach(c => allNodes.push({ ...c, parentName: n.name }))
+      n.children.forEach(c => {
+        if (!seen.has(c.id)) { seen.add(c.id); allNodes.push({ ...c, parentName: n.name }) }
+      })
     } else if (n.type === 'expense' && n.status !== 'closed') {
-      allNodes.push(n)
+      if (!seen.has(n.id)) { seen.add(n.id); allNodes.push(n) }
     } else if (n.type === 'jar') {
-      allNodes.push(n)
+      if (!n.originalId && !seen.has(n.id)) { seen.add(n.id); allNodes.push(n) }
     } else if (n.type === 'remainder') {
-      allNodes.push(n)
+      if (!seen.has(n.id)) { seen.add(n.id); allNodes.push(n) }
     }
   })
 
@@ -227,13 +230,17 @@ export default function HistoryPage() {
     }
   })
 
-  // Flat list để filter
+  // Flat list để filter — dedupe theo id (tránh clone trùng jar gốc)
   const allFilterNodes = []
+  const seenFilter = new Set()
   nodes.forEach(n => {
     if (n.type === 'group' && n.children) {
-      n.children.forEach(c => allFilterNodes.push({ ...c, parentName: n.name }))
+      n.children.forEach(c => {
+        if (!seenFilter.has(c.id)) { seenFilter.add(c.id); allFilterNodes.push({ ...c, parentName: n.name }) }
+      })
     } else if (!['income', 'remainder'].includes(n.type)) {
-      allFilterNodes.push(n)
+      // Bỏ qua clone (có originalId) vì jar gốc đã được push từ group.children
+      if (!n.originalId && !seenFilter.has(n.id)) { seenFilter.add(n.id); allFilterNodes.push(n) }
     }
   })
 

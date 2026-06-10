@@ -24,8 +24,8 @@ export default function App() {
       color: '#f1f5f9',
       fontFamily: "'DM Sans', sans-serif",
       overflow: 'hidden',
-      maxWidth: 480,
-      margin: '0 auto',
+     // maxWidth: 480,
+     // margin: '0 auto',
       position: 'relative',
     }}>
       {/* Google Font */}
